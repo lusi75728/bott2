@@ -37,9 +37,9 @@ async def on_ready():
 # ----------------- 공통 함수 -----------------
 def init_user(data, user_id):
     if user_id not in data:
-        # 시간 기록 필드 추가
         data[user_id] = {
             "money": 0, "wins": 0, "losses": 0, 
+            "last_daily": "", "last_reward": "", 
             "last_loan": "", "last_support": ""
         }
     return data
@@ -52,7 +52,6 @@ async def add_money(interaction: discord.Interaction, 유저: discord.Member, �
     app_info = await bot.application_info()
     if interaction.user.id != app_info.owner.id:
         return await interaction.followup.send("권한이 없습니다.", ephemeral=True)
-    
     data = load_data()
     uid = str(유저.id)
     init_user(data, uid)
@@ -72,6 +71,46 @@ async def check_wallet(interaction: discord.Interaction):
     embed.add_field(name="보유 금액", value=f"{u['money']:,}원")
     embed.add_field(name="승률", value=f"{win_rate:.1f}% ({u['wins']}승 {u['losses']}패)")
     await interaction.followup.send(embed=embed)
+
+@bot.tree.command(name="출석체크", description="하루에 한 번 10,000원 지급.")
+async def daily(interaction: discord.Interaction):
+    await interaction.response.defer()
+    data = load_data()
+    uid = str(interaction.user.id)
+    init_user(data, uid)
+    today = datetime.now().strftime("%Y-%m-%d")
+    if data[uid].get("last_daily") == today:
+        return await interaction.followup.send("오늘은 이미 출석하셨습니다.", ephemeral=True)
+    data[uid]["money"] += 10000
+    data[uid]["last_daily"] = today
+    save_data(data)
+    await interaction.followup.send("출석체크 완료! 10,000원이 지급되었습니다.")
+
+@bot.tree.command(name="보상금", description="3시간마다 50,000원 지급.")
+async def reward(interaction: discord.Interaction):
+    await interaction.response.defer()
+    data = load_data()
+    uid = str(interaction.user.id)
+    init_user(data, uid)
+    last = data[uid].get("last_reward", "")
+    if last and datetime.now() < datetime.strptime(last, "%Y-%m-%d %H:%M:%S") + timedelta(hours=3):
+        return await interaction.followup.send("아직 보상금을 받을 수 없습니다.", ephemeral=True)
+    data[uid]["money"] += 50000
+    data[uid]["last_reward"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    save_data(data)
+    await interaction.followup.send("보상금 50,000원이 지급되었습니다.")
+
+@bot.tree.command(name="랭킹", description="서버 유저 돈 랭킹 확인.")
+async def leader_board(interaction: discord.Interaction):
+    await interaction.response.defer()
+    data = load_data()
+    rank = sorted([(k, v["money"]) for k, v in data.items()], key=lambda x: x[1], reverse=True)[:10]
+    embed = discord.Embed(title="🏆 서버 부자 순위", color=0xf1c40f)
+    for i, (uid, money) in enumerate(rank, 1):
+        embed.add_field(name=f"{i}등", value=f"<@{uid}>: {money:,}원", inline=False)
+    await interaction.followup.send(embed=embed)
+
+
 
 @bot.tree.command(name="도박", description="배팅하고 결과를 확인합니다.")
 @app_commands.describe(배팅액="금액", 레버러지="단계 선택")
