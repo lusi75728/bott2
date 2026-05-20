@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
+# 토큰은 환경 변수에서 가져옵니다. .env 파일에 BOT_TOKEN을 설정하세요.
 TOKEN = os.getenv('BOT_TOKEN')
 
 # 봇 기본 설정
@@ -373,7 +374,10 @@ async def leader_board(interaction: discord.Interaction):
             medal = "🥇" if index == 1 else "🥈" if index == 2 else "🥉" if index == 3 else f"**{index}등**"
             description_text += f"{medal} {user_mention} ➡️ **{u_money:,}머니**\n"
         embed.description = description_text
-         
+          
     await interaction.response.send_message(embed=embed)
 
-bot.run(TOKEN)
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("오류: BOT_TOKEN이 .env 파일에 설정되지 않았습니다.")
