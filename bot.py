@@ -42,28 +42,28 @@ async def on_ready():
     except Exception as e:
         print(f"동기화 중 오류 발생: {e}")
 
-# 👑 봇 소유자 전용 돈 추가 명령어
+# 👑 봇 소유자 전용 돈 추가 명령어 (수정된 버전)
 @bot.tree.command(name="돈추가", description="[봇 소유자 전용] 특정 유저에게 돈을 추가합니다.")
 @app_commands.describe(유저="돈을 지급할 유저를 선택하세요.", 금액="지급할 금액을 숫자로 입력하세요.")
 async def add_money(interaction: discord.Interaction, 유저: discord.Member, 금액: int):
     await interaction.response.defer()
+    
+    
     app_info = await bot.application_info()
     if interaction.user.id != app_info.owner.id:
-        embed = discord.Embed(title="❌ 권한 없음", description="이 명령어는 봇 소유자만 사용할 수 있습니다.", color=0xe74c3c)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send("❌ 권한 없음", ephemeral=True)
         return
 
-    if 금액 <= 0:
-        embed = discord.Embed(title="❌ 오류", description="0원 이하의 금액은 추가할 수 없습니다.", color=0xe74c3c)
-        await interaction.followup.send(embed=embed, ephemeral=True)
-        return
-
+    
     target_id = str(유저.id)
     data = load_data()
+    
     if target_id not in data or not isinstance(data[target_id], dict):
         data[target_id] = {"money": 0, "last_daily": "", "last_reward": "", "wins": 0, "losses": 0}
         
-    data[target_id]["money"] += 금액
+   
+    data[target_id]["money"] = int(data[target_id].get("money", 0)) + 금액
+    
     save_data(data)
     
     embed = discord.Embed(title="👑 관리자 권한 지급 완료", color=0xf1c40f)
@@ -146,11 +146,11 @@ async def reward(interaction: discord.Interaction):
         except:
             pass
             
-    data[user_id]["money"] = int(data[user_id].get("money", 0)) + 30000
+    data[user_id]["money"] = int(data[user_id].get("money", 0)) + 50000
     data[user_id]["last_reward"] = now.strftime("%Y-%m-%d %H:%M:%S")
     save_data(data)
     
-    embed = discord.Embed(title="🎁 보상금 수령 완료", description=f"{interaction.user.mention}님, 3시간 보상금 **30,000머니**이 지급되었습니다!", color=0x2ecc71)
+    embed = discord.Embed(title="🎁 보상금 수령 완료", description=f"{interaction.user.mention}님, 3시간 보상금 **50,000머니**이 지급되었습니다!", color=0x2ecc71)
     embed.add_field(name="현재 잔액", value=f"{data[user_id]['money']:,}머니")
     await interaction.followup.send(embed=embed)
 
@@ -288,8 +288,7 @@ async def gamble(interaction: discord.Interaction, 배팅액: int, 레버러지:
     view = GambleView(interaction.user.id, 배팅액, win_multiplier_bonus, lose_multiplier, 모드이름)
     
     embed = discord.Embed(title="도박 진행 중", color=0x3498db)
-    embed.description = f"🎰 **승리 확률 : {view.random_probability}%**\n\n> 🎯 **결과 : 버튼을 눌러 확인**"
-    
+    embed.description = f"🎰 **승리 확률 : {view.random_probability}%**\n\n> 🎯 **결과 : 버튼을 눌러 확인**"    
     await interaction.response.send_message(embed=embed, view=view)
 
 
@@ -316,6 +315,56 @@ async def leader_board(interaction: discord.Interaction):
         
     await interaction.response.send_message(embed=embed)
 
+# 1. /정보확인 (상대방 잔액 및 승률)
+@bot.tree.command(name="정보확인", description="다른 유저의 잔액과 승률을 확인합니다.")
+@app_commands.describe(유저="확인할 유저를 선택하세요.")
+async def check_info(interaction: discord.Interaction, 유저: discord.Member):
+    data = load_data()
+    user_id = str(유저.id)
+    
+    if user_id not in data:
+        await interaction.response.send_message(f"{유저.display_name} 님은 아직 데이터를 가지고 있지 않습니다.", ephemeral=True)
+        return
+
+    u_data = data[user_id]
+    wins = u_data.get("wins", 0)
+    losses = u_data.get("losses", 0)
+    total = wins + losses
+    win_rate = (wins / total * 100) if total > 0 else 0
+    
+    embed = discord.Embed(title=f"📊 {유저.display_name} 님 정보", color=0x2ecc71)
+    embed.add_field(name="💰 잔액", value=f"{u_data.get('money', 0):,} 머니")
+    embed.add_field(name="🎯 승률", value=f"{win_rate:.1f}% ({total}전 {wins}승 {losses}패)")
+    await interaction.response.send_message(embed=embed)
+
+# 2. /대출 (-500,000원 이하일 때만 가능, -값 초기화 및 +200,000 지급)
+@bot.tree.command(name="대출", description="잔액이 -500,000원 이하일 때만 가능합니다. 빚을 청산하고 200,000원을 받습니다.")
+async def loan(interaction: discord.Interaction):
+    data = load_data()
+    user_id = str(interaction.user.id)
+    
+    if user_id not in data or data[user_id]["money"] > -500000:
+        await interaction.response.send_message("❌ 대출 자격이 안 됩니다. 잔액이 -500,000원 이하일 때만 대출이 가능합니다.", ephemeral=True)
+        return
+        
+    data[user_id]["money"] = 200000
+    save_data(data)
+    await interaction.response.send_message("✅ 대출이 승인되었습니다! 모든 빚이 청산되고 200,000원이 지급되었습니다.")
+
+# 3. /재난지원금 (-10,000원 이하인 사람만 10~40만 랜덤 지급)
+@bot.tree.command(name="재난지원금", description="-10,000원 이하인 분들에게 랜덤 지원금을 드립니다.")
+async def support(interaction: discord.Interaction):
+    data = load_data()
+    user_id = str(interaction.user.id)
+    
+    if user_id not in data or data[user_id]["money"] > -10000:
+        await interaction.response.send_message("❌ 지원 대상자가 아닙니다. 잔액이 -10,000원 이하인 경우에만 신청 가능합니다.", ephemeral=True)
+        return
+        
+    amount = random.randint(100000, 400000)
+    data[user_id]["money"] += amount
+    save_data(data)
+    await interaction.response.send_message(f"🎁 재난지원금이 지급되었습니다! 당신은 **{amount:,}머니**를 받았습니다.")
 
 if TOKEN:
     bot.run(TOKEN)
