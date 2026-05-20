@@ -72,6 +72,7 @@ async def add_money(interaction: discord.Interaction, 유저: discord.Member, �
     data[target_id]["money"] += 금액
     save_data(data)
     
+    # image_2bb721.png 스타일 반영
     embed = discord.Embed(title="👑 관리자 권한 지급 완료", color=0xf1c40f)
     embed.description = f"👤 **대상 유저 : {유저.mention}**\n\n> 💰 **지급된 금액 : +{금액:,}머니**\n\n🔹 **잔액 : {data[target_id]['money']:,}머니**"
     await interaction.followup.send(embed=embed)
@@ -186,6 +187,7 @@ class GambleView(discord.ui.View):
             data[self.user_id]["money"] -= net_loss
             save_data(data)
             
+            # image_2b42c4.png & image_2bb73e.png 스타일 반영
             embed = discord.Embed(title="도박에 실패했어요", color=0xe74c3c)
             embed.description = f"🎰 **승리 확률 : {self.random_probability}%**\n\n> 🎯 **결과 : -{net_loss:,}머니**\n\n🔹 **잔액 : {data[self.user_id]['money']:,}머니 | 현재 모드 : {self.모드이름}**"
 
@@ -219,7 +221,7 @@ async def gamble(interaction: discord.Interaction, 배팅액: int, 레버러지:
     # 버튼 클래스 생성
     view = GambleView(interaction.user.id, 배팅액, win_multiplier_bonus, lose_multiplier, 모드이름)
     
-    # 대기 상태 임베드 세팅
+    # 대기 상태 임베드 세팅 (image_2bb780.png 스타일 반영)
     embed = discord.Embed(title="도박 진행 중", color=0x3498db)
     embed.description = f"🎰 **승리 확률 : {view.random_probability}%**\n\n> 🎯 **결과 : 버튼을 눌러 확인**\n\n🔹 **현재 모드 : {모드이름}**"
     
