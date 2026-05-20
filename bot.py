@@ -56,7 +56,9 @@ async def add_money(interaction: discord.Interaction, 유저: discord.Member, �
     init_user(data, uid)
     data[uid]["money"] += 금액
     save_data(data)
-    embed = discord.Embed(title="✅ 지급 완료", description=f"{유저.mention} 님께 {금액:,}원을 지급했습니다.", color=0x2ecc71)
+    embed = discord.Embed(title="✅ 지급 완료", color=0x2ecc71)
+    embed.add_field(name="지급 금액", value=f"+{금액:,}원", inline=True)
+    embed.add_field(name="💰 현재 보유 금액", value=f"**{data[uid]['money']:,}원**", inline=True)
     await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="지갑", description="내 정보를 확인합니다.")
@@ -68,7 +70,7 @@ async def check_wallet(interaction: discord.Interaction):
     u = data[uid]
     win_rate = (u["wins"] / (u["wins"] + u["losses"]) * 100) if (u["wins"] + u["losses"]) > 0 else 0
     embed = discord.Embed(title="👛 내 지갑 정보", color=0x3498db)
-    embed.add_field(name="💰 보유 금액", value=f"{u['money']:,}원", inline=False)
+    embed.add_field(name="💰 현재 보유 금액", value=f"**{u['money']:,}원**", inline=False)
     embed.add_field(name="📊 전적", value=f"{u['wins']}승 {u['losses']}패 (승률: {win_rate:.1f}%)", inline=False)
     await interaction.followup.send(embed=embed)
 
@@ -85,7 +87,9 @@ async def daily(interaction: discord.Interaction):
     data[uid]["money"] += 10000
     data[uid]["last_daily"] = today
     save_data(data)
-    embed = discord.Embed(title="✅ 출석 완료", description="10,000원이 지급되었습니다!", color=0x2ecc71)
+    embed = discord.Embed(title="✅ 출석 완료", color=0x2ecc71)
+    embed.add_field(name="지급 금액", value="+10,000원", inline=True)
+    embed.add_field(name="💰 현재 보유 금액", value=f"**{data[uid]['money']:,}원**", inline=True)
     await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="보상금", description="3시간마다 50,000원 지급.")
@@ -101,7 +105,9 @@ async def reward(interaction: discord.Interaction):
     data[uid]["money"] += 50000
     data[uid]["last_reward"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_data(data)
-    embed = discord.Embed(title="🎁 보상금 지급", description="50,000원이 지급되었습니다!", color=0x2ecc71)
+    embed = discord.Embed(title="🎁 보상금 지급", color=0x2ecc71)
+    embed.add_field(name="지급 금액", value="+50,000원", inline=True)
+    embed.add_field(name="💰 현재 보유 금액", value=f"**{data[uid]['money']:,}원**", inline=True)
     await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="대출", description="잔액이 -500,000원 이하일 때 가능. (24시간 쿨타임)")
@@ -123,7 +129,9 @@ async def loan(interaction: discord.Interaction):
     data[uid]["money"] = 200000
     data[uid]["last_loan"] = now.strftime("%Y-%m-%d %H:%M:%S")
     save_data(data)
-    embed = discord.Embed(title="✅ 대출 승인", description="모든 빚이 청산되고 200,000원이 지급되었습니다.", color=0x2ecc71)
+    embed = discord.Embed(title="✅ 대출 승인", color=0x2ecc71)
+    embed.add_field(name="지급 금액", value="+200,000원", inline=True)
+    embed.add_field(name="💰 현재 보유 금액", value=f"**{data[uid]['money']:,}원**", inline=True)
     await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="재난지원금", description="잔액 -10,000원 이하일 때 랜덤 지원. (12시간 쿨타임)")
@@ -146,7 +154,9 @@ async def support(interaction: discord.Interaction):
     data[uid]["money"] += amount
     data[uid]["last_support"] = now.strftime("%Y-%m-%d %H:%M:%S")
     save_data(data)
-    embed = discord.Embed(title="🎁 지원금 지급", description=f"{amount:,}원이 지급되었습니다!", color=0x2ecc71)
+    embed = discord.Embed(title="🎁 지원금 지급", color=0x2ecc71)
+    embed.add_field(name="지급 금액", value=f"+{amount:,}원", inline=True)
+    embed.add_field(name="💰 현재 보유 금액", value=f"**{data[uid]['money']:,}원**", inline=True)
     await interaction.followup.send(embed=embed)
 
 if TOKEN: bot.run(TOKEN)
