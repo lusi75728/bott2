@@ -242,12 +242,17 @@ async def send_money(interaction: discord.Interaction, 유저: discord.Member, �
         await interaction.followup.send(embed=embed, ephemeral=True)
         return
         
+    # 송금 처리
     data[from_id]["money"] = from_money - 금액
     data[to_id]["money"] = int(data[to_id].get("money", 0)) + 금액
     save_data(data)
     
+    # 수정된 embed: 송금자와 수금자의 잔액 모두 표시
     embed = discord.Embed(title="💸 송금 성공", color=0x2ecc71)
-    embed.description = f"👤 **{interaction.user.mention} ➡️ {유저.mention}**\n\n> 💵 **보낸 금액 : {금액:,}머니**\n\n🔹 **내 남은 잔액 : {data[from_id]['money']:,}머니**"
+    embed.description = f"👤 **{interaction.user.mention} ➡️ {유저.mention}**\n\n" \
+                        f"💵 **보낸 금액 : {금액:,}머니**\n\n" \
+                        f"🔹 **나의 잔액 : {data[from_id]['money']:,}머니**\n" \
+                        f"🔸 **상대 잔액 : {data[to_id]['money']:,}머니**"
     await interaction.followup.send(embed=embed)
 
 # 🔘 [결과 확인] 버튼 컴포넌트 클래스
