@@ -4,8 +4,16 @@ from discord.ext import commands
 import random
 import json
 import os
+import threading
+from flask import Flask
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+
+# 렌더용 웹 서버 (봇이 꺼지지 않게 유지)
+app = Flask(__name__)
+@app.route('/')
+def home(): return "Bot is running!"
+def run_web(): app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
 # 봇 설정
 intents = discord.Intents.default()
@@ -31,7 +39,7 @@ def get_user_data(data, user_id):
         data[u_id] = {"money": 0, "wins": 0, "losses": 0, "last_daily": "", "last_reward": "", "last_emergency": "", "last_loan": ""}
     return data[u_id]
 
-# --- 통일된 임베드 함수 (알로항봇 스타일) ---
+# --- 통일된 임베드 함수 ---
 def get_embed(title, description, color):
     return discord.Embed(title=title, description=description, color=color)
 
@@ -139,6 +147,8 @@ async def on_ready():
     await bot.tree.sync()
     print(f'{bot.user.name} 가동 시작!')
 
-load_dotenv()
+# 렌더링 유지 및 봇 실행
 if __name__ == "__main__":
+    threading.Thread(target=run_web, daemon=True).start()
+    load_dotenv()
     bot.run(os.getenv('BOT_TOKEN'))
