@@ -7,8 +7,7 @@ import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-load_dotenv()
-TOKEN = os.getenv('BOT_TOKEN')
+# 봇 설정
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
@@ -32,19 +31,11 @@ def get_user_data(data, user_id):
         data[u_id] = {"money": 0, "wins": 0, "losses": 0, "last_daily": "", "last_reward": "", "last_emergency": "", "last_loan": ""}
     return data[u_id]
 
-# --- 공통 임베드 함수 (요청하신 디자인) ---
+# --- 공통 임베드 함수 (디자인 통일) ---
 def get_embed(title, description, color):
     return discord.Embed(title=title, description=description, color=color)
 
-# --- 명령어 ---
-
-@bot.tree.command(name="송금", description="다른 유저에게 돈을 보냅니다.")
-async def send_money(interaction: discord.Interaction, 유저: discord.Member, 금액: int):
-    data = load_data(); u_f = get_user_data(data, interaction.user.id); u_t = get_user_data(data, 유저.id)
-    if u_f["money"] < 금액 or 금액 <= 0: return await interaction.response.send_message("❌ 잔액이 부족하거나 잘못된 금액입니다.", ephemeral=True)
-    u_f["money"] -= 금액; u_t["money"] += 금액; save_data(data)
-    desc = f"🎯 **송금 대상 : {유저.mention}**\n\n> 💰 **송금액 : {금액:,}머니**\n\n🔹 **잔액 : {u_f['money']:,}머니**"
-    await interaction.response.send_message(embed=get_embed("💸 송금 성공", desc, 0x2ecc71))
+# --- 명령어들 ---
 
 @bot.tree.command(name="돈추가", description="[관리자] 유저에게 돈을 추가합니다.")
 async def add_money(interaction: discord.Interaction, 유저: discord.Member, 금액: int):
@@ -69,6 +60,43 @@ async def daily(interaction: discord.Interaction):
     desc = f"💰 **지급 금액 : +10,000머니**\n\n🔹 **잔액 : {u['money']:,}머니**"
     await interaction.response.send_message(embed=get_embed("💵 출석체크 완료", desc, 0x2ecc71))
 
+@bot.tree.command(name="보상금", description="3시간마다 30,000머니 지급")
+async def reward(interaction: discord.Interaction):
+    data = load_data(); u = get_user_data(data, interaction.user.id)
+    if u["last_reward"] and datetime.strptime(u["last_reward"], "%Y-%m-%d %H:%M:%S") + timedelta(hours=3) > datetime.now():
+        return await interaction.response.send_message("🚨 3시간 대기 필요", ephemeral=True)
+    u["money"] += 30000; u["last_reward"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S"); save_data(data)
+    desc = f"💰 **지급 금액 : +30,000머니**\n\n🔹 **잔액 : {u['money']:,}머니**"
+    await interaction.response.send_message(embed=get_embed("🎁 보상금 수령", desc, 0x2ecc71))
+
+@bot.tree.command(name="재난지원금", description="-10,000 이하일 때 6시간마다 랜덤 지급")
+async def emergency_money(interaction: discord.Interaction):
+    data = load_data(); u = get_user_data(data, interaction.user.id)
+    if u["money"] > -10000: return await interaction.response.send_message("❌ 잔액 -10,000 이하만 가능", ephemeral=True)
+    if u["last_emergency"] and datetime.strptime(u["last_emergency"], "%Y-%m-%d %H:%M:%S") + timedelta(hours=6) > datetime.now():
+        return await interaction.response.send_message("🚨 6시간 대기 필요", ephemeral=True)
+    amt = random.randint(100000, 400000); u["money"] += amt; u["last_emergency"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S"); save_data(data)
+    desc = f"💰 **지급 금액 : +{amt:,}머니**\n\n🔹 **잔액 : {u['money']:,}머니**"
+    await interaction.response.send_message(embed=get_embed("🏥 재난지원금 수령", desc, 0x3498db))
+
+@bot.tree.command(name="대출", description="-5,000,000 이하일 때 200,000 지급")
+async def loan(interaction: discord.Interaction):
+    data = load_data(); u = get_user_data(data, interaction.user.id)
+    if u["money"] > -5000000: return await interaction.response.send_message("❌ 잔액 -5,000,000 이하만 가능", ephemeral=True)
+    if u["last_loan"] and datetime.strptime(u["last_loan"], "%Y-%m-%d %H:%M:%S") + timedelta(hours=24) > datetime.now():
+        return await interaction.response.send_message("🚨 24시간 대기 필요", ephemeral=True)
+    u["money"] = 200000; u["last_loan"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S"); save_data(data)
+    desc = f"💰 **지급 금액 : +200,000머니**\n\n🔹 **잔액 : {u['money']:,}머니**"
+    await interaction.response.send_message(embed=get_embed("🏦 대출(구제) 완료", desc, 0xf1c40f))
+
+@bot.tree.command(name="송금", description="다른 유저에게 돈을 보냅니다.")
+async def send_money(interaction: discord.Interaction, 유저: discord.Member, 금액: int):
+    data = load_data(); u_f = get_user_data(data, interaction.user.id); u_t = get_user_data(data, 유저.id)
+    if u_f["money"] < 금액 or 금액 <= 0: return await interaction.response.send_message("❌ 잔액 부족", ephemeral=True)
+    u_f["money"] -= 금액; u_t["money"] += 금액; save_data(data)
+    desc = f"🎯 **송금 대상 : {유저.mention}**\n\n> 💰 **송금액 : {금액:,}머니**\n\n🔹 **잔액 : {u_f['money']:,}머니**"
+    await interaction.response.send_message(embed=get_embed("💸 송금 성공", desc, 0x2ecc71))
+
 @bot.tree.command(name="랭킹", description="서버 돈 랭킹 확인")
 async def leader_board(interaction: discord.Interaction):
     data = load_data(); ranking = sorted([(uid, info.get("money", 0)) for uid, info in data.items() if isinstance(info, dict)], key=lambda x: x[1], reverse=True)[:10]
@@ -88,13 +116,13 @@ class GambleView(discord.ui.View):
         dice = random.randint(1, 100)
         if dice <= self.random_probability:
             profit = self.배팅액 * self.win_mul; u["money"] += profit; u["wins"] += 1; title, color = "도박에 성공했어요", 0x3498db
-            desc = f"🎰 **승리 확률 : {self.random_probability}%**\n\n> 🎯 **결과 : +{profit:,}머니**\n\n🔹 **잔액 : {u['money']:,}머니 | 현재 모드 : {self.mode_name}**"
+            desc = f"🎰 **승리 확률 : {self.random_probability}%**\n\n> 🎯 **결과 : +{profit:,}머니**\n\n🔹 **잔액 : {u['money']:,}머니 | 모드 : {self.mode_name}**"
         else:
             loss = self.배팅액 * self.win_mul; u["money"] -= loss; u["losses"] += 1; title, color = "도박에 실패했어요", 0xe74c3c
-            desc = f"🎰 **승리 확률 : {self.random_probability}%**\n\n> 🎯 **결과 : -{loss:,}머니**\n\n🔹 **잔액 : {u['money']:,}머니 | 현재 모드 : {self.mode_name}**"
+            desc = f"🎰 **승리 확률 : {self.random_probability}%**\n\n> 🎯 **결과 : -{loss:,}머니**\n\n🔹 **잔액 : {u['money']:,}머니 | 모드 : {self.mode_name}**"
         save_data(data); self.clear_items(); await interaction.response.edit_message(embed=get_embed(title, desc, color), view=self)
 
-@bot.tree.command(name="도박", description="배팅액과 레버리지를 걸고 도박합니다.")
+@bot.tree.command(name="도박", description="배팅액과 레버러지를 설정해 도박합니다.")
 @app_commands.choices(레버리지=[
     app_commands.Choice(name="일반 모드(1배)", value=1), app_commands.Choice(name="레버러지 1단계(3배)", value=3),
     app_commands.Choice(name="레버러지 2단계(6배)", value=6), app_commands.Choice(name="레버러지 3단계(8배)", value=8)
@@ -107,5 +135,10 @@ async def gamble(interaction: discord.Interaction, 배팅액: int, 레버리지:
     await interaction.response.send_message(embed=embed, view=view)
 
 @bot.event
-async def on_ready(): await bot.tree.sync(); print(f'{bot.user.name} 가동 중')
-bot.run(TOKEN
+async def on_ready():
+    await bot.tree.sync()
+    print(f'{bot.user.name} 가동 시작!')
+
+load_dotenv()
+if __name__ == "__main__":
+    bot.run(os.getenv('BOT_TOKEN'))
