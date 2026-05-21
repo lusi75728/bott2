@@ -7,16 +7,6 @@ import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-app = Flask(__name__)
-@app.route('/')
-def home():
-    return "Bot is running!"
-
-def run_web():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
-
-# 봇 실행 전 웹 서버 시작
-Thread(target=run_web).start()
 
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')
