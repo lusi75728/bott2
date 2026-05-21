@@ -28,14 +28,11 @@ def save_data(data):
 
 def get_user_data(data, user_id):
     u_id = str(user_id)
-    if u_id not in data:
+    if u_id not in data or not isinstance(data[u_id], dict):
         data[u_id] = {"money": 0, "wins": 0, "losses": 0, "last_daily": "", "last_reward": "", "last_emergency": "", "last_loan": ""}
-    defaults = {"money": 0, "wins": 0, "losses": 0, "last_daily": "", "last_reward": "", "last_emergency": "", "last_loan": ""}
-    for k, v in defaults.items():
-        if k not in data[u_id]: data[u_id][k] = v
     return data[u_id]
 
-# --- 사진과 동일한 디자인의 임베드 함수 ---
+# --- 디자인 통일된 임베드 함수 (유저, 지급/결과, 잔액) ---
 def create_embed(title, user, field2_name, field2_val, current_money, color):
     embed = discord.Embed(title=title, color=color)
     embed.add_field(name="유저", value=user.mention, inline=False)
@@ -43,15 +40,14 @@ def create_embed(title, user, field2_name, field2_val, current_money, color):
     embed.add_field(name="🔹 현재 잔액", value=f"{current_money:,}머니", inline=False)
     return embed
 
-# --- 관리자 명령어 ---
+# --- 명령어 ---
+
 @bot.tree.command(name="돈추가", description="[관리자] 유저에게 돈을 추가합니다.")
 async def add_money(interaction: discord.Interaction, 유저: discord.Member, 금액: int):
-    # 봇 소유자 확인 로직 (필요시 수정)
     data = load_data(); u = get_user_data(data, 유저.id)
     u["money"] += 금액; save_data(data)
     await interaction.response.send_message(embed=create_embed("👑 관리자 권한 지급", 유저, "💰 지급 금액", f"+{금액:,}머니", u["money"], 0xf1c40f))
 
-# --- 일반 명령어 ---
 @bot.tree.command(name="지갑", description="내 정보를 확인합니다.")
 async def check_wallet(interaction: discord.Interaction):
     data = load_data(); u = get_user_data(data, interaction.user.id)
@@ -96,11 +92,12 @@ async def loan(interaction: discord.Interaction):
     u["money"] = 200000; u["last_loan"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S"); save_data(data)
     await interaction.response.send_message(embed=create_embed("🏦 대출(구제) 완료", interaction.user, "💰 지급 금액", "+200,000머니", u["money"], 0xf1c40f))
 
-@bot.tree.command(name="랭킹", description="서버 유저들의 돈 랭킹")
+@bot.tree.command(name="랭킹", description="서버 부자 순위 Top 10")
 async def leader_board(interaction: discord.Interaction):
-    data = load_data(); ranking = sorted([(uid, info.get("money", 0)) for uid, info in data.items() if isinstance(info, dict)], key=lambda x: x[1], reverse=True)[:10]
-    embed = discord.Embed(title="🏆 서버 돈 랭킹 (Top 10)", color=0xf1c40f)
-    embed.description = "\n".join([f"{i+1}. <@{uid}>: {m:,}머니" for i, (uid, m) in enumerate(ranking)])
+    data = load_data()
+    rank = sorted([(k, v['money']) for k, v in data.items() if isinstance(v, dict)], key=lambda x: x[1], reverse=True)[:10]
+    desc = "\n".join([f"{'🥇' if i==0 else '🥈' if i==1 else '🥉' if i==2 else f'{i+1}등'} <@{uid}> ➡️ {m:,}머니" for i, (uid, m) in enumerate(rank)])
+    embed = discord.Embed(title="🏆 서버 돈 랭킹", description=desc, color=0xf1c40f)
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="송금", description="유저에게 송금")
@@ -117,22 +114,30 @@ async def send_money(interaction: discord.Interaction, 유저: discord.Member, �
 
 # 레버리지 도박 로직
 class GambleView(discord.ui.View):
-    def __init__(self, user_id, bet, prob): super().__init__(timeout=60); self.u_id = str(user_id); self.bet = bet; self.prob = prob
+    def __init__(self, user_id, bet, mul, mode): super().__init__(timeout=60); self.u_id = str(user_id); self.bet = bet; self.mul = mul; self.mode = mode
     @discord.ui.button(label="👀 결과 확인", style=discord.ButtonStyle.primary)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if str(interaction.user.id) != self.u_id: return
-        data = load_data(); u = get_user_data(data, interaction.user.id)
-        win = random.randint(1, 100) <= self.prob
-        if win: u["money"] += self.bet; u["wins"] += 1; title, color = "도박 성공", 0x3498db
-        else: u["money"] -= self.bet; u["losses"] += 1; title, color = "도박 실패", 0xe74c3c
+        data = load_data(); u = get_user_data(data, self.u_id)
+        prob = random.randint(1, 100); win = random.randint(1, 100) <= prob
+        if win:
+            gain = self.bet * self.mul; u["money"] += gain; u["wins"] += 1; title, color = "도박 성공", 0x3498db
+            res = f"{gain:,}머니 획득 (승률 {prob}%)"
+        else:
+            loss = self.bet * self.mul; u["money"] -= loss; u["losses"] += 1; title, color = "도박 실패", 0xe74c3c
+            res = f"{loss:,}머니 손실 (승률 {prob}%)"
         save_data(data)
-        await interaction.response.edit_message(embed=create_embed(title, interaction.user, "💰 결과", f"{self.bet:,}머니 {'획득' if win else '손실'}", u["money"], color), view=None)
+        await interaction.response.edit_message(embed=create_embed(title, interaction.user, "💰 결과", res, u["money"], color), view=None)
 
-@bot.tree.command(name="도박", description="배팅액을 걸고 도박")
-async def gamble(interaction: discord.Interaction, 배팅액: int, 승률: int = 50):
+@bot.tree.command(name="도박", description="레버리지를 선택하여 도박합니다.")
+@app_commands.choices(레버리지=[
+    app_commands.Choice(name="없음(1배)", value=1), app_commands.Choice(name="1단계(3배)", value=3),
+    app_commands.Choice(name="2단계(6배)", value=6), app_commands.Choice(name="3단계(8배)", value=8)
+])
+async def gamble(interaction: discord.Interaction, 배팅액: int, 레버리지: app_commands.Choice[int]):
     data = load_data(); u = get_user_data(data, interaction.user.id)
     if u["money"] < 배팅액: return await interaction.response.send_message("❌ 잔액 부족", ephemeral=True)
-    await interaction.response.send_message(f"🎰 **결과 확인 (승률 {승률}%)**", view=GambleView(interaction.user.id, 배팅액, 승률))
+    await interaction.response.send_message(f"🎰 **도박 시작 ({레버리지.name})**", view=GambleView(interaction.user.id, 배팅액, 레버리지.value, 레버리지.name))
 
 @bot.event
 async def on_ready(): await bot.tree.sync(); print(f'{bot.user.name} 가동 중')
