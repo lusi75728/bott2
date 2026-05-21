@@ -37,6 +37,26 @@ def get_embed(title, description, color):
 
 # --- 명령어들 ---
 
+@bot.tree.command(name="정보확인", description="다른 유저의 잔액과 승률을 확인합니다.")
+@app_commands.describe(유저="확인할 유저를 선택하세요.")
+async def check_info(interaction: discord.Interaction, 유저: discord.Member):
+    data = load_data()
+    user_id = str(유저.id)
+    
+    if user_id not in data:
+        await interaction.response.send_message(f"{유저.display_name} 님은 아직 데이터를 가지고 있지 않습니다.", ephemeral=True)
+        return
+
+    u_data = data[user_id]
+    wins = u_data.get("wins", 0)
+    losses = u_data.get("losses", 0)
+    total = wins + losses
+    win_rate = (wins / total * 100) if total > 0 else 0
+    
+    embed = discord.Embed(title=f"📊 {유저.display_name} 님 정보", color=0x2ecc71)
+    embed.add_field(name="💰 잔액", value=f"{u_data.get('money', 0):,} 머니")
+    embed.add_field(name="🎯 승률", value=f"{win_rate:.1f}% ({total}전 {wins}승 {losses}패)")
+    await interaction.response.send_message(embed=embed)
 @bot.tree.command(name="돈추가", description="[관리자] 유저에게 돈을 추가합니다.")
 async def add_money(interaction: discord.Interaction, 유저: discord.Member, 금액: int):
     data = load_data(); u = get_user_data(data, 유저.id)
@@ -69,16 +89,18 @@ async def reward(interaction: discord.Interaction):
     desc = f"💰 **지급 금액 : +30,000머니**\n\n🔹 **잔액 : {u['money']:,}머니**"
     await interaction.response.send_message(embed=get_embed("🎁 보상금 수령", desc, 0x2ecc71))
 
-@bot.tree.command(name="재난지원금", description="-10,000보다 빚이 더 많을 때(예: -10,001 이하) 6시간마다 랜덤 지급")
-async def emergency_money(interaction: discord.Interaction):
+@bot.tree.command(name="재난지원금", description="잔액 -10,000원 이하일 때 랜덤 지원.")
+async def support(interaction: discord.Interaction):
+    await interaction.response.defer()
     data = load_data()
-    u = get_user_data(data, interaction.user.id)
-    
-    # 1. 조건 수정: 잔액이 -10,000보다 크면(빚이 적으면) 지급 불가
-    # 예: 잔액이 -5,000이면 통과 못함, -15,000이면 통과 가능
-    if u["money"] >= -10000:
-        return await interaction.response.send_message("❌ 잔액이 -10,000원보다 많습니다. 재난지원금의 신청요건을 충족하지 못했어요!
-잔액이 -10,000원 이하인 유저만 신청 가능합니다!", ephemeral=True)
+    uid = str(interaction.user.id)
+    init_user(data, uid)
+    if data[uid]["money"] > -10000:
+        return await interaction.followup.send("대상자가 아닙니다.", ephemeral=True)
+    amount = random.randint(100000, 400000)
+    data[uid]["money"] += amount
+    save_data(data)
+    await interaction.followup.send(f"지원금 {amount:,}원이 지급되었습니다.")
     
     # 2. 6시간 쿨타임 체크
     now = datetime.now()
