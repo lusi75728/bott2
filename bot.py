@@ -69,14 +69,37 @@ async def reward(interaction: discord.Interaction):
     desc = f"💰 **지급 금액 : +30,000머니**\n\n🔹 **잔액 : {u['money']:,}머니**"
     await interaction.response.send_message(embed=get_embed("🎁 보상금 수령", desc, 0x2ecc71))
 
-@bot.tree.command(name="재난지원금", description="-10,000 이하일 때 6시간마다 랜덤 지급")
+@bot.tree.command(name="재난지원금", description="-10,000보다 빚이 더 많을 때(예: -10,001 이하) 6시간마다 랜덤 지급")
 async def emergency_money(interaction: discord.Interaction):
-    data = load_data(); u = get_user_data(data, interaction.user.id)
-    if u["money"] > -10000: return await interaction.response.send_message("❌ 잔액 -10,000 이하만 가능", ephemeral=True)
-    if u["last_emergency"] and datetime.strptime(u["last_emergency"], "%Y-%m-%d %H:%M:%S") + timedelta(hours=6) > datetime.now():
-        return await interaction.response.send_message("🚨 6시간 대기 필요", ephemeral=True)
-    amt = random.randint(100000, 400000); u["money"] += amt; u["last_emergency"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S"); save_data(data)
-    desc = f"💰 **지급 금액 : +{amt:,}머니**\n\n🔹 **잔액 : {u['money']:,}머니**"
+    data = load_data()
+    u = get_user_data(data, interaction.user.id)
+    
+    # 1. 조건 수정: 잔액이 -10,000보다 크면(빚이 적으면) 지급 불가
+    # 예: 잔액이 -5,000이면 통과 못함, -15,000이면 통과 가능
+    if u["money"] >= -10000:
+        return await interaction.response.send_message("❌ 잔액이 -10,000원보다 많습니다. 재난지원금의 신청요건을 충족하지 못했어요!
+잔액이 -10,000원 이하인 유저만 신청 가능합니다!", ephemeral=True)
+    
+    # 2. 6시간 쿨타임 체크
+    now = datetime.now()
+    if u.get("last_emergency"):
+        try:
+            last_time = datetime.strptime(u["last_emergency"], "%Y-%m-%d %H:%M:%S")
+            if last_time + timedelta(hours=6) > now:
+                remaining = (last_time + timedelta(hours=6) - now)
+                hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+                minutes, _ = divmod(remainder, 60)
+                return await interaction.response.send_message(f"🚨 아직 수령할 수 없습니다. 남은 시간: {hours}시간 {minutes}분", ephemeral=True)
+        except ValueError:
+            pass 
+            
+    # 3. 100,000 ~ 400,000 랜덤 지급
+    amt = random.randint(100000, 400000)
+    u["money"] += amt
+    u["last_emergency"] = now.strftime("%Y-%m-%d %H:%M:%S")
+    save_data(data)
+    
+    desc = f"💰 **지급 금액 : +{amt:,}머니**\n\n🔹 **현재 잔액 : {u['money']:,}머니**"
     await interaction.response.send_message(embed=get_embed("🏥 재난지원금 수령", desc, 0x3498db))
 
 @bot.tree.command(name="대출", description="-5,000,000 이하일 때 200,000 지급")
