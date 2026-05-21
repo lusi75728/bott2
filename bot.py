@@ -9,19 +9,22 @@ from flask import Flask
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# 웹 서버 설정 (렌더링 유지용)
+# 렌더용 웹 서버 (포트 오류 방지)
 app = Flask(__name__)
 @app.route('/')
 def home(): return "Bot is running!"
 def run_web(): app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
-# 봇 설정
+# .env 로드 (로컬용)
+load_dotenv()
+
+# 데이터 및 봇 설정
+DATA_FILE = "money.json"
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
-DATA_FILE = "money.json"
 
-# --- 데이터 관리 ---
+# --- 유틸 함수 ---
 def load_data():
     if os.path.exists(DATA_FILE):
         try:
@@ -39,8 +42,8 @@ def get_user_data(data, user_id):
         data[u_id] = {"money": 0, "wins": 0, "losses": 0, "last_daily": "", "last_reward": "", "last_emergency": "", "last_loan": ""}
     return data[u_id]
 
-# --- 명령어들 ---
-
+# --- 명령어 영역 ---
+# [여기에 기존 송금, 도박, 돈추가 등의 함수들을 그대로 넣어주세요]
 @bot.tree.command(name="돈추가", description="[관리자] 유저에게 돈을 추가합니다.")
 async def add_money(interaction: discord.Interaction, 유저: discord.Member, 금액: int):
     data = load_data(); u = get_user_data(data, 유저.id)
@@ -136,7 +139,15 @@ async def on_ready():
     await bot.tree.sync()
     print(f'{bot.user.name} 가동 시작!')
 
+# 렌더 실행부
 if __name__ == "__main__":
+    # 웹 서버 시작
     threading.Thread(target=run_web, daemon=True).start()
-    load_dotenv()
-    bot.run(os.getenv('BOT_TOKEN'))
+    
+    # 토큰 로드 (환경 변수 확인)
+    TOKEN = os.environ.get('BOT_TOKEN')
+    
+    if not TOKEN:
+        print("경고: BOT_TOKEN을 찾을 수 없습니다. 환경 변수를 확인하세요.")
+    else:
+        bot.run(TOKEN)
