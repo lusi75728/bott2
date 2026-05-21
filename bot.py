@@ -1,20 +1,24 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
-import random, json, os, threading
-from flask import Flask
-from datetime import datetime, timedelta
+import os
+import threading
 from dotenv import load_dotenv
 
-# --- [추가] 렌더링 유지용 웹 서버 ---
-app = Flask(__name__)
-@app.route('/')
-def home(): return "Bot is running!"
-def run_web(): app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+# Flask 모듈을 안전하게 로드
+try:
+    from flask import Flask
+    app = Flask(__name__)
+    @app.route('/')
+    def home(): return "Bot is running!"
+    def run_web(): app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    flask_available = True
+except ImportError:
+    flask_available = False
 
-# --- (기존 데이터 관리 및 명령어 함수들은 동일하게 넣으세요) ---
-# ... (상단에 작성하신 함수들) ...
-# ... (명령어들) ...
+# 봇 설정
+bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
+
+# ... (기존 명령어 함수들은 그대로 유지) ...
 @bot.tree.command(name="돈추가", description="[관리자] 유저에게 돈을 추가합니다.")
 async def add_money(interaction: discord.Interaction, 유저: discord.Member, 금액: int):
     data = load_data(); u = get_user_data(data, 유저.id)
@@ -104,17 +108,13 @@ async def gamble(interaction: discord.Interaction, 배팅액: int, 레버리지:
     if u["money"] < 배팅액: return await interaction.response.send_message("❌ 잔액 부족", ephemeral=True)
     view = GambleView(interaction.user.id, 배팅액, 레버리지.value, 레버리지.name)
     await interaction.response.send_message(f"🎰 도박 시작! 배팅액: {배팅액:,} (레버리지 {레버리지.name})", view=view)
-
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f'{bot.user.name} 가동 시작!')
-
-# --- [수정] 렌더 실행부 ---
 if __name__ == "__main__":
-    # 웹 서버를 별도 스레드로 먼저 실행
-    threading.Thread(target=run_web, daemon=True).start()
+    if flask_available:
+        threading.Thread(target=run_web, daemon=True).start()
     
-    # 디스코드 봇 실행
     load_dotenv()
-    bot.run(os.getenv('BOT_TOKEN'))
+    token = os.getenv('BOT_TOKEN')
+    if token:
+        bot.run(token)
+    else:
+        print("에러: BOT_TOKEN을 찾을 수 없습니다.")
