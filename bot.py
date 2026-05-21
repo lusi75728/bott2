@@ -44,7 +44,6 @@ def get_embed(title, description, color):
     return discord.Embed(title=title, description=description, color=color)
 
 # --- 명령어들 ---
-
 @bot.tree.command(name="돈추가", description="[관리자] 유저에게 돈을 추가합니다.")
 async def add_money(interaction: discord.Interaction, 유저: discord.Member, 금액: int):
     data = load_data(); u = get_user_data(data, 유저.id)
@@ -151,4 +150,5 @@ async def on_ready():
 if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
     load_dotenv()
-    bot.run(os.getenv('BOT_TOKEN'))
+    TOKEN = os.getenv('BOT_TOKEN')
+    bot.run(TOKEN)
